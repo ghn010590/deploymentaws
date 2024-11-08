@@ -1,0 +1,10 @@
+numpy
+pandas
+joblib
+matplotlib
+scikit-learn
+xgboost
+gradio
+prometheus_client
+flask
+pickle
