@@ -5,16 +5,16 @@ from prometheus_client import Gauge, start_http_server, generate_latest
 from flask import Flask, Response
 from sklearn.metrics import r2_score, f1_score, precision_score, recall_score
 
-# Load model
+
 def load_model(model_path):
     with open(model_path, 'rb') as file:
         loaded_model = pickle.load(file)
     return loaded_model
 
 model = load_model('xgboost-model.pkl')
-test_data = pd.read_csv('path_to_your_test_dataset.csv')  # Ensure this path is correct and accessible
+test_data = pd.read_csv('heart_failure_clinical_records_dataset.csv')
 
-# Prometheus Metrics
+
 R2_METRIC = Gauge('model_r2_score', 'R2 score for model predictions')
 F1_METRIC = Gauge('model_f1_score', 'F1 score for model predictions')
 PRECISION_METRIC = Gauge('model_precision_score', 'Precision for model predictions')
@@ -22,10 +22,12 @@ RECALL_METRIC = Gauge('model_recall_score', 'Recall for model predictions')
 
 app = Flask(__name__)
 
-@app.route("/metrics")
-def metrics():
-    sample = test_data.sample(100)  # Randomly sample 100 data points for metrics calculation
-    features = sample.drop('DEATH_EVENT', axis=1)  # Assuming 'DEATH_EVENT' is the label column
+
+
+@app.get("/metrics")
+async def metrics():
+    sample = test_data.sample(100)
+    features = sample.drop('DEATH_EVENT', axis=1)
     true_values = sample['DEATH_EVENT'].values
     
     predictions = model.predict(features)
@@ -39,9 +41,9 @@ def metrics():
     PRECISION_METRIC.set(precision)
     RECALL_METRIC.set(recall)
     
-    return Response(generate_latest(), mimetype="text/plain")
+    return Response(generate_latest(), media_type="text/plain")
 
-# Gradio app setup
+
 def predict_death_event(age, anaemia, creatinine_phosphokinase, diabetes, ejection_fraction,
                         high_blood_pressure, platelets, serum_creatinine, serum_sodium, sex,
                         smoking, time):
@@ -63,8 +65,28 @@ def predict_death_event(age, anaemia, creatinine_phosphokinase, diabetes, ejecti
     prediction = model.predict(input_data)
     return "High risk of death" if prediction[0] == 1 else "Low risk of death"
 
-iface = gr.Interface(fn=predict_death_event, inputs="text", outputs="text", title="Patient Survival Prediction")
+iface = gr.Interface(
+    fn=predict_death_event,
+    inputs=[
+        gr.Slider(minimum=0, maximum=100, step=1, label="Age"),
+        gr.Radio(choices=[0, 1], label="Anaemia"),
+        gr.Slider(minimum=0, maximum=10000, step=1, label="CPK Level"),
+        gr.Radio(choices=[0, 1], label="Diabetes"),
+        gr.Slider(minimum=10, maximum=80, step=1, label="Ejection Fraction"),
+        gr.Radio(choices=[0, 1], label="High Blood Pressure"),
+        gr.Slider(minimum=10000, maximum=500000, step=1000, label="Platelets"),
+        gr.Slider(minimum=0.5, maximum=10.0, step=0.1, label="Serum Creatinine"),
+        gr.Slider(minimum=100, maximum=150, step=1, label="Serum Sodium"),
+        gr.Radio(choices=[0, 1], label="Sex"),
+        gr.Radio(choices=[0, 1], label="Smoking"),
+        gr.Slider(minimum=0, maximum=300, step=1, label="Follow-up Time")
+    ],
+    outputs="text",
+    title="Patient Survival Prediction",
+    description="Predict survival of patient with heart failure, given their clinical record"
+)
+
 iface.launch(server_name="0.0.0.0", server_port=8002)
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8002)
+    app.run(host='0.0.0.0', port=8001)
