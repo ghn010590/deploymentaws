@@ -2,9 +2,9 @@ import pandas as pd
 import pickle
 import gradio as gr
 from prometheus_client import Gauge, start_http_server, generate_latest
-from flask import Flask, Response
+#from flask import Flask, Response
 from sklearn.metrics import r2_score, f1_score, precision_score, recall_score
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 import uvicorn
 
 CUSTOM_PATH = "/"
@@ -45,7 +45,7 @@ async def metrics():
     PRECISION_METRIC.set(precision)
     RECALL_METRIC.set(recall)
     
-    return Response(generate_latest(), mimetype="text/plain")
+    return Response(content = generate_latest(), media_type="text/plain")
 
 
 def predict_death_event(age, anaemia, creatinine_phosphokinase, diabetes, ejection_fraction,
