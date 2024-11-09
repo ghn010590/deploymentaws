@@ -4,6 +4,10 @@ import gradio as gr
 from prometheus_client import Gauge, start_http_server, generate_latest
 from flask import Flask, Response
 from sklearn.metrics import r2_score, f1_score, precision_score, recall_score
+from fastapi import FastAPI
+import uvicorn
+
+CUSTOM_PATH = "/"
 
 
 def load_model(model_path):
@@ -20,7 +24,7 @@ F1_METRIC = Gauge('model_f1_score', 'F1 score for model predictions')
 PRECISION_METRIC = Gauge('model_precision_score', 'Precision for model predictions')
 RECALL_METRIC = Gauge('model_recall_score', 'Recall for model predictions')
 
-app = Flask(__name__)
+app = FastAPI()
 
 
 
@@ -31,17 +35,17 @@ async def metrics():
     true_values = sample['DEATH_EVENT'].values
     
     predictions = model.predict(features)
-    r2 = r2_score(true_values, predictions).round(3)
-    f1 = f1_score(true_values, predictions, average='macro').round(3)
-    precision = precision_score(true_values, predictions, average='macro').round(3)
-    recall = recall_score(true_values, predictions, average='macro').round(3)
+    r2 = round(r2_score(true_values, predictions), 3)
+    f1 = round(f1_score(true_values, predictions, average='macro'),3)
+    precision = round(precision_score(true_values, predictions, average='macro'),3)
+    recall = round(recall_score(true_values, predictions, average='macro'),3)
 
     R2_METRIC.set(r2)
     F1_METRIC.set(f1)
     PRECISION_METRIC.set(precision)
     RECALL_METRIC.set(recall)
     
-    return Response(generate_latest(), media_type="text/plain")
+    return Response(generate_latest(), mimetype="text/plain")
 
 
 def predict_death_event(age, anaemia, creatinine_phosphokinase, diabetes, ejection_fraction,
@@ -86,7 +90,9 @@ iface = gr.Interface(
     description="Predict survival of patient with heart failure, given their clinical record"
 )
 
-iface.launch(server_name="0.0.0.0", server_port=8002)
+#iface.launch(server_name="0.0.0.0", server_port=8002)
+
+app = gr.mount_gradio_app(app, iface, path=CUSTOM_PATH)
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8001)
+    uvicorn.run(app, host='0.0.0.0', port=8002)
